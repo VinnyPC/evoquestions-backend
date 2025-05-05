@@ -2,15 +2,16 @@ import httpx
 from app.core.config import GEMINI_API_KEY
 
 async def gerar_pergunta_gemini(topico: str):
-    prompt = (
-        f"Crie uma pergunta objetiva sobre {topico}. "
-        f"Dê 4 alternativas, indique a correta e forneça feedbacks. "
-        f"Responda em JSON com 'pergunta', 'alternativas', 'correta', 'feedbacks'."
-    )
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+    headers = {
+        "Content-Type": "application/json"
+    }
 
-    url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
-    headers = { "Content-Type": "application/json" }
-    params = { "key": GEMINI_API_KEY }
+    prompt = (
+        f"Crie 10 perguntas objetivas de múltipla escolha sobre {topico}. "
+        "Responda apenas como um array JSON com 10 objetos, onde cada objeto contém os campos: "
+        "'pergunta', 'alternativas' (com 4 opções), 'correta' (como texto igual a uma das alternativas), e 'feedbacks' (dando explicação para cada alternativa)."
+    )
 
     body = {
         "contents": [{
@@ -18,14 +19,14 @@ async def gerar_pergunta_gemini(topico: str):
         }]
     }
 
-    async with httpx.AsyncClient() as client:
-        response = await client.post(url, headers=headers, params=params, json=body)
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(url, headers=headers, json=body)
 
     if response.status_code == 200:
         try:
-            text = response.json()['candidates'][0]['content']['parts'][0]['text']
-            return {"resposta": text}
+            resposta = response.json()['candidates'][0]['content']['parts'][0]['text']
+            return {"resposta": resposta}
         except Exception as e:
-            return {"erro": "Formato inesperado", "detalhes": str(e)}
+            return {"erro": "Erro ao extrair conteúdo", "detalhes": str(e)}
     else:
-        return {"erro": "Erro ao chamar a API do Gemini", "status": response.status_code}
+        return {"erro": "Erro ao chamar a API Gemini", "status": response.status_code, "body": response.text}
